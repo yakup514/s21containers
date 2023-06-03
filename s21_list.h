@@ -9,6 +9,7 @@
 #define list_h
 #include <cstddef>
 #include <initializer_list>
+#include <limits>
 namespace s21 {
 template <class T>
 class List  {
@@ -41,6 +42,7 @@ public:
         const_reference operator*() const;
         bool operator!=(const ListConstIterator& iter) const noexcept;
         void operator++();
+        void operator--();
     };
     class ListIterator : public ListConstIterator {
     public:
@@ -57,7 +59,17 @@ public:
     iterator end();
     iterator begin();
     
+    bool empty();
+    size_type size();
+    size_type max_size();
+    
     void clear();
+    iterator insert(iterator pos, const_reference value);
+    void erase(iterator pos);
+    void push_back(const_reference value);
+    void pop_back();
+    void push_front(const_reference value);
+    void pop_front();
 private:
     ListNode* head_;
     size_type size_;
@@ -71,13 +83,16 @@ s21::List<value_type>::List() : size_(0){
    head_ = new ListNode;
    head_->next_ = head_;
    head_->prev_ = head_;
+    head_->value_ = 0;
 }
 
 template<class value_type>
 s21::List<value_type>::List(size_type n) : s21::List<value_type>::List() {
+    if (n > max_size())
+        throw std::out_of_range("size > max_size");
    ListNode* node;
    ListNode* prev_node = head_;
-   for (int i = 0; i < n; ++i) {
+   for (size_t i = 0; i < n; ++i) {
        node = new ListNode;
        prev_node->next_ = node;
        node->prev_ = prev_node;
@@ -108,11 +123,14 @@ s21::List<value_type>::List(const List& l) : s21::List<value_type>::List(l.size_
 
 template<class value_type>
 s21::List<value_type>::List(List&& l) : s21::List<value_type>::List(){
-    head_->next_ = l.head_->next_;
-    l.head_->prev_->next_= head_;
-    size_ = l.size_;
-    delete l.head_;
-    l.head_ = nullptr;
+    if (l.head_->next_ != l.head_) {
+        head_->next_ = l.head_->next_;
+        l.head_->prev_->next_= head_;
+        size_ = l.size_;
+        delete l.head_;
+        l.head_ = nullptr;
+        l.size_ = 0;
+    }
 }
 
 template<class value_type>
@@ -125,18 +143,26 @@ s21::List<value_type>::~List() {
 
 template <class value_type>
 void s21::List<value_type>::operator=(List &&l) noexcept{
-    clear();
-    head_->next_ = l.head_->next_;
-    l.head_->prev_->next_= head_;
-    size_ = l.size_;
-    delete l.head_;
-    l.head_ = nullptr;
+    if (l.head_->next_ != l.head_) {
+        clear();
+        head_->next_ = l.head_->next_;
+        l.head_->prev_->next_= head_;
+        size_ = l.size_;
+        delete l.head_;
+        l.head_ = nullptr;
+        l.size_ = 0;
+    }
 }
 
 //--------------------------List Element access
 template<class value_type>
 typename s21::List<value_type>::const_reference s21::List<value_type>::back() {
     return head_->prev_;
+}
+
+template<class value_type>
+typename s21::List<value_type>::const_reference s21::List<value_type>::front() {
+    return head_->next_;
 }
 
 //-----------------------------------------------------------------
@@ -164,6 +190,11 @@ bool s21::List<value_type>::const_iterator::operator!=(const typename s21::List<
 template <class value_type>
 void s21::List<value_type>::const_iterator::operator++() {
    data_ = data_->next_;
+}
+
+template <class value_type>
+void s21::List<value_type>::const_iterator::operator--() {
+   data_ = data_->prev_;
 }
 
 template <class value_type>
@@ -213,7 +244,20 @@ typename s21::List<value_type>::iterator s21::List<value_type>::end() {
    return result;
 }
 
+//-----------------------List Capacity
+template <class value_type>
+bool s21::List<value_type>::empty() {
+    return size_ == 0;
+}
 
+template <class value_type>
+typename s21::List<value_type>::size_type s21::List<value_type>::size() {
+    return size_;
+}
+template <class value_type>
+typename s21::List<value_type>::size_type s21::List<value_type>::max_size() {
+    return std::numeric_limits<size_type>::max()/sizeof(ListNode);
+}
 
 //-------------------------List Modifiers----------------
 template <class value_type>
@@ -229,7 +273,61 @@ void s21::List<value_type>::clear() {
     size_ = 0;
 }
 
+template <class value_type>
+typename s21::List<value_type>::iterator s21::List<value_type>::insert(iterator pos, const_reference value) {
+ListNode* new_node = new ListNode(value);
+    pos.data_->prev_->next_ = new_node;
+    new_node->prev_ = pos.data_->prev_;
+    new_node->next_ = pos.data_;
+    pos.data_->prev_ = new_node;
+    size_ += 1;
+    --pos;
+    return pos;
+}
 
+template <class value_type>
+void s21::List<value_type>::erase(iterator pos) {
+    pos.data_->prev_->next_ = pos.data_->next_;
+    pos.data_->next_->prev_ = pos.data_->prev_;
+    delete pos.data_;
+    size_ -= 1;
+}
 
+template <class value_type>
+void s21::List<value_type>::push_back(const_reference value) {
+    ListNode* new_node = new ListNode(value);
+    head_->prev_->next_ = new_node;
+    new_node->prev_ = head_->prev_;
+    new_node->next_ = head_;
+    head_->prev_ = new_node;
+    ++size_;
+}
 
+template <class value_type>
+void s21::List<value_type>::pop_back(){
+    ListNode* tmp = head_->prev_;
+    tmp->prev_->next_ = head_;
+    head_->prev_ = tmp->prev_;
+    delete  tmp;
+    --size_;
+}
+
+template <class value_type>
+void s21::List<value_type>::push_front(const_reference value){
+    ListNode* new_node = new ListNode(value);
+    head_->next_->prev_ = new_node;
+    new_node->next_ = head_->next_;
+    new_node->prev_ = head_;
+    head_->next_ = new_node;
+    ++size_;
+}
+
+template <class value_type>
+void s21::List<value_type>::pop_front(){
+    ListNode* tmp = head_->next_;
+    tmp->next_->prev_ = head_;
+    head_->next_ = tmp->next_;
+    delete  tmp;
+    --size_;
+}
 #endif /* list_h */
