@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <limits>
+#include <unordered_set>
 namespace s21 {
 template <class T>
 class List  {
@@ -36,28 +37,45 @@ public:
         ListNode* prev_;
     };
     class ListConstIterator {
+        friend class List;
     public:
         ListConstIterator();
-        ListNode* data_;
+        ListConstIterator(ListNode&& node);
         const_reference operator*() const;
         bool operator!=(const ListConstIterator& iter) const noexcept;
+        ListConstIterator operator+(size_t n);
+        ListConstIterator operator-(size_t n);
         void operator++();
         void operator--();
+    private:
+        ListNode* data_;
     };
     class ListIterator : public ListConstIterator {
+        friend class List;
     public:
         ListIterator();
+        ListIterator(ListNode* node);
         //ListNode* data_;
         reference operator*();
+        ListIterator operator+(size_t n);
+        ListIterator operator-(size_t n);
+        bool operator!=(const ListIterator& iter) const noexcept;
+        void operator++();
+        void operator--();
+//    private:
+//         ListNode* data_;
         //bool operator!=(const ListIterator& iter);
         //void operator++();
     };
     using iterator = ListIterator;
     using const_iterator = ListConstIterator;
-    const_iterator end() const;
-    const_iterator begin() const;
-    iterator end();
-    iterator begin();
+   // const_iterator end() const;
+   // const_iterator begin() const;
+    iterator end() const;
+    iterator begin() const;
+    
+    size_t distance(iterator from, iterator to);
+    //size_t distance(const_iterator from, const_iterator to);
     
     bool empty();
     size_type size();
@@ -70,12 +88,35 @@ public:
     void pop_back();
     void push_front(const_reference value);
     void pop_front();
+    void swap(List& other);
+    void merge(List& other);
+    void splice(const_iterator pos, List& other);
+    void reverse();
+    void unique();
+    void sort();
+    iterator partition(iterator begin, iterator end);
+    void quicksort(iterator begin, iterator end);
+    template <typename... Args>
+    iterator emplace(const_iterator pos, Args&&... args);
+    template <typename... Args>
+    void emplace_back(Args&&... args);
+    template <typename... Args>
+    void emplace_front(Args&&... args);
 private:
+    
     ListNode* head_;
     size_type size_;
     
+    
 };
+
 }
+//template<class value_type>
+//bool operator <(typename s21::List<value_type>::const_iterator lhs, typename s21::List<value_type>::const_iterator rhs) {
+//    while (lhs.data_ != head_)
+//}
+
+
 
 //------------------List Functions---------------------------
 template <class value_type>
@@ -127,8 +168,8 @@ s21::List<value_type>::List(List&& l) : s21::List<value_type>::List(){
         head_->next_ = l.head_->next_;
         l.head_->prev_->next_= head_;
         size_ = l.size_;
-        delete l.head_;
-        l.head_ = nullptr;
+        l.head_->next_ = l.head_;
+        l.head_->prev_ = l.head_;
         l.size_ = 0;
     }
 }
@@ -157,12 +198,12 @@ void s21::List<value_type>::operator=(List &&l) noexcept{
 //--------------------------List Element access
 template<class value_type>
 typename s21::List<value_type>::const_reference s21::List<value_type>::back() {
-    return head_->prev_;
+    return head_->prev_->value_;
 }
 
 template<class value_type>
 typename s21::List<value_type>::const_reference s21::List<value_type>::front() {
-    return head_->next_;
+    return head_->next_->value_;
 }
 
 //-----------------------------------------------------------------
@@ -181,6 +222,10 @@ s21::List<value_type>::ListNode::ListNode(const value_type& val) : value_(val), 
 template <class value_type>
 s21::List<value_type>::const_iterator::ListConstIterator() : data_(nullptr) {
 }
+
+//template <class value_type>
+//s21::List<value_type>::const_iterator::ListConstIterator(ListNode&& node) : data_(nullptr) {
+//}
 
 template <class value_type>
 bool s21::List<value_type>::const_iterator::operator!=(const typename s21::List<value_type>::const_iterator& iter) const noexcept{
@@ -202,9 +247,31 @@ typename s21::List<value_type>::const_reference s21::List<value_type>::const_ite
     return data_->value_;
 }
 
+template <class value_type>
+typename s21::List<value_type>::ListConstIterator s21::List<value_type>::const_iterator::operator+(size_t n){
+    const_iterator tmp = *this;
+    for (size_t i = 0; i < n; ++i)
+        ++tmp;
+    return tmp;
+}
+
+template <class value_type>
+typename s21::List<value_type>::ListConstIterator s21::List<value_type>::const_iterator::operator-(size_t n){
+    const_iterator tmp = *this;
+    for (size_t i = 0; i < n; ++i)
+        ++tmp;
+    return tmp;
+}
+
+
 //------------------iterator------------------------------------
 template <class value_type>
 s21::List<value_type>::iterator::ListIterator() : ListConstIterator() {
+}
+
+template <class value_type>
+s21::List<value_type>::iterator::ListIterator(ListNode* node) : ListConstIterator() {
+    this->data_ = node;
 }
 
 template <class value_type>
@@ -212,36 +279,83 @@ typename s21::List<value_type>::reference s21::List<value_type>::iterator::opera
     return this->data_->value_;
 }
 
+template <class value_type>
+typename s21::List<value_type>::iterator s21::List<value_type>::iterator::operator+(size_t n){
+    iterator tmp = *this;
+    for (size_t i = 0; i < n; ++i)
+        ++(tmp);
+    return tmp;
+}
 
+template <class value_type>
+typename s21::List<value_type>::iterator s21::List<value_type>::iterator::operator-(size_t n){
+    for (size_t i = 0; i < n; ++i)
+        --(*this);
+    return *this;
+}
 
+template <class value_type>
+bool s21::List<value_type>::iterator::operator!=(const ListIterator& iter) const noexcept {
+    return this->data_ != iter.data_;
+}
+
+template <class value_type>
+void s21::List<value_type>::iterator::operator++() {
+   this->data_ = this->data_->next_;
+}
+
+template <class value_type>
+void s21::List<value_type>::iterator::operator--() {
+   this->data_ = this->data_->prev_;
+}
 
 //---------------------------------------------------------------
-template <class value_type>
-typename s21::List<value_type>::const_iterator s21::List<value_type>::begin() const{
-   typename s21::List<value_type>::const_iterator result;
-   result.data_ = head_->next_;
-   return result;
-}
+//template <class value_type>
+//typename s21::List<value_type>::const_iterator s21::List<value_type>::begin() const{
+//   typename s21::List<value_type>::const_iterator result;
+//   result.data_ = head_->next_;
+//   return result;
+//}
+
+//template <class value_type>
+//typename s21::List<value_type>::const_iterator s21::List<value_type>::end() const{
+//   typename s21::List<value_type>::const_iterator result;
+//   result.data_ = head_;
+//   return result;
+//}
 
 template <class value_type>
-typename s21::List<value_type>::const_iterator s21::List<value_type>::end() const{
-   typename s21::List<value_type>::const_iterator result;
-   result.data_ = head_;
-   return result;
-}
-
-template <class value_type>
-typename s21::List<value_type>::iterator s21::List<value_type>::begin() {
+typename s21::List<value_type>::iterator s21::List<value_type>::begin() const{
    typename s21::List<value_type>::iterator result;
    result.data_ = head_->next_;
    return result;
 }
 
 template <class value_type>
-typename s21::List<value_type>::iterator s21::List<value_type>::end() {
+typename s21::List<value_type>::iterator s21::List<value_type>::end() const{
    typename s21::List<value_type>::iterator result;
    result.data_ = head_;
    return result;
+}
+
+//template <class value_type>
+//size_t s21::List<value_type>::distance(const_iterator from, const_iterator to) {
+//    size_t res = 0;
+//    while (from != to) {
+//        ++from;
+//        ++res;
+//    }
+//    return res;
+//}
+
+template <class value_type>
+size_t s21::List<value_type>::distance(iterator from, iterator to) {
+    size_t res = 0;
+    while (from != to) {
+        ++from;
+        ++res;
+    }
+    return res;
 }
 
 //-----------------------List Capacity
@@ -275,6 +389,8 @@ void s21::List<value_type>::clear() {
 
 template <class value_type>
 typename s21::List<value_type>::iterator s21::List<value_type>::insert(iterator pos, const_reference value) {
+    if (size_ >= max_size())
+        throw std::out_of_range("size > max_size");
 ListNode* new_node = new ListNode(value);
     pos.data_->prev_->next_ = new_node;
     new_node->prev_ = pos.data_->prev_;
@@ -295,6 +411,8 @@ void s21::List<value_type>::erase(iterator pos) {
 
 template <class value_type>
 void s21::List<value_type>::push_back(const_reference value) {
+    if (size_ >= max_size())
+        throw std::out_of_range("size > max_size");
     ListNode* new_node = new ListNode(value);
     head_->prev_->next_ = new_node;
     new_node->prev_ = head_->prev_;
@@ -314,6 +432,8 @@ void s21::List<value_type>::pop_back(){
 
 template <class value_type>
 void s21::List<value_type>::push_front(const_reference value){
+    if (size_ >= max_size())
+        throw std::out_of_range("size > max_size");
     ListNode* new_node = new ListNode(value);
     head_->next_->prev_ = new_node;
     new_node->next_ = head_->next_;
@@ -330,4 +450,142 @@ void s21::List<value_type>::pop_front(){
     delete  tmp;
     --size_;
 }
+
+template <class value_type>
+void s21::List<value_type>::swap(List& other) {
+    std::swap(size_, other.size_);
+    std::swap(head_, other.head_);
+}
+
+template <class value_type>
+void s21::List<value_type>::merge(List& other){
+    iterator other_it = other.begin();
+    iterator this_it = begin();
+    while (other_it != other.end()) {
+        if (this_it != end() && *this_it < *other_it) {
+            ++this_it;
+        } else {
+            ListNode* tmp = other_it.data_->next_;
+            this_it.data_->prev_->next_ = other_it.data_;
+            other_it.data_->prev_ = this_it.data_->prev_;
+            other_it.data_->next_ = this_it.data_;
+            this_it.data_->prev_ = other_it.data_;
+            other_it.data_ = tmp;
+        }
+    }
+    other.head_->prev_ = other.head_;
+    other.head_->next_ = other.head_;
+    size_ += other.size_;
+    other.size_ = 0;
+}
+
+template <class value_type>
+void s21::List<value_type>::splice(const_iterator pos, List& other) {
+    const_iterator it = other.begin();
+    pos.data_->prev_->next_ = it.data_;
+    it.data_->prev_ = pos.data_->prev_;
+    other.head_->prev_->next_ = pos.data_;
+    pos.data_->prev_ = other.head_->prev_;
+    other.head_->next_ = other.head_;
+    other.head_->prev_ = other.head_;
+    size_ += other.size_;
+    other.size_ = 0;
+    
+}
+
+template <class value_type>
+void s21::List<value_type>::reverse() {
+    auto left = begin();
+    auto right = end();
+    --right;
+    size_t iterations = 0;
+    while (iterations < size_/2) {
+        std::swap(*left, *right);
+        ++left;
+        --right;
+        ++iterations;
+    }
+}
+
+template <class value_type>
+void s21::List<value_type>::unique() {
+    std::unordered_set<value_type> data;
+    auto it = begin();
+    for(auto d : *this) {
+        if (data.find(d) != data.end()) {
+            auto tmp = it;
+            ++it;
+            erase(tmp);
+        } else {
+            data.insert(*it);
+        }
+    }
+}
+
+template <class value_type>
+typename s21::List<value_type>::iterator s21::List<value_type>::partition(iterator begin, iterator end) {
+    iterator pivot = end;
+    iterator p_ind = begin;
+    auto end_list = this->end();
+    for (iterator it = begin; distance(it, end_list) > distance(end, end_list); ++it) {
+        if (*it <= *pivot) {
+            std::swap(*it, *p_ind);
+            ++p_ind;
+        }
+    }
+    std::swap(*p_ind, *end);
+    return p_ind;
+}
+template <class value_type>
+void s21::List<value_type>::quicksort(iterator begin, iterator end) {
+    iterator end_list = this->end();
+    if (distance(begin, end_list) <= distance(end, end_list))
+        return;
+    iterator pivot = partition(begin, end);
+    quicksort(begin, pivot != this->begin() ? pivot - 1 : pivot);
+    quicksort(pivot != this->end() ? pivot + 1 : pivot, end);
+}
+
+template <class value_type>
+void s21::List<value_type>::sort() {
+    quicksort(begin(), end() - 1);
+}
+
+template <class value_type>
+template <typename... Args>
+typename s21::List<value_type>::iterator s21::List<value_type>::emplace(const_iterator pos, Args&&... args) {
+    s21::List<value_type> tmp_list({args...});
+    if (tmp_list.size() > 0) {
+        if (size_ + tmp_list.size() > max_size())
+            throw std::out_of_range("size > max_size");
+        else
+            size_ += tmp_list.size();
+        const_iterator pos_next = pos + 1;
+        tmp_list.head_->prev_->next_ = head_->next_;
+        pos.data_->next_ = tmp_list.head_->next_;
+        tmp_list.head_->next_->prev_ = pos.data_;
+        pos_next.data_->prev_ = tmp_list.head_->prev_;
+        tmp_list.head_->prev_->next_ = pos_next.data_;
+        tmp_list.head_->next_ = tmp_list.head_;
+        tmp_list.head_->prev_ = tmp_list.head_;
+        ++pos;
+        iterator result(pos.data_);
+        return result;
+    }
+    return begin();
+}
+
+template <class value_type>
+template <typename... Args>
+void s21::List<value_type>::emplace_back(Args&&... args) {
+    emplace(end() - 1, args...);
+}
+
+template <class value_type>
+template <typename... Args>
+void s21::List<value_type>::emplace_front(Args&&... args) {
+    emplace(end(), args...);
+}
+//template <typename... Args>
+//void emplace_front(Args&&... args);
 #endif /* list_h */
