@@ -9,8 +9,8 @@ endif
 
 all: clean test gcov_report
 
-test: *.cpp
-	g++ -std=c++17 $(CFLAGS) *.cpp $(MYFLAGS) -o  test
+test: test.cpp
+	g++ -std=c++17 $(CFLAGS) test.cpp $(MYFLAGS) -o  test
 	./test
 	
 s21_matrix_oop.a: s21_matrix_oop.cpp

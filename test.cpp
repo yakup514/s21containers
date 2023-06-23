@@ -9,7 +9,7 @@
 
 
 #include "tests/list_test.h"
-
+#include "tests/set_test.h"
 
 
 

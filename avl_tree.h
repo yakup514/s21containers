@@ -30,6 +30,8 @@ public:
     AvlTree();
     AvlTree(value_type key);
     AvlTree(std::initializer_list<value_type> const &items);
+    AvlTree(const AvlTree& other);
+    //AvlTree(AvlTree&& other);
     ~AvlTree();
     //private:
     struct TreeNode {
@@ -69,14 +71,15 @@ public:
         TreeIterator(const TreeIterator& it) : TreeIterator(it.data_){};
         reference operator*();
         bool operator!=(const TreeIterator& iter) const noexcept;
+        bool operator==(const TreeIterator& iter) const noexcept;
         TreeIterator operator+(size_t n);
         TreeIterator operator-(size_t n);
         void operator++();
         void operator--();
     };
     //------------------------------iterators access---------------------------
-    iterator begin();
-    iterator end();
+    iterator begin() const;
+    iterator end() const;
     
     //------------------------------capacity------------------------------------
     bool empty();
@@ -112,10 +115,11 @@ public:
     node* find_key(node* n, value_type key);
     void print_tree(node* n);
     //-------------------------tree func-----------------------------------------
-    iterator insert(const_reference key);
-public:
+    std::pair<iterator, bool> insert(const_reference key);
+protected:
     node* root_, *end_, *begin_;
     size_type size_{};
+    bool multi_{false};
     
     // int size_;
 
@@ -125,7 +129,7 @@ public:
 template <class value_type>
 AvlTree<value_type>::AvlTree() {
     root_ = begin_ = end_= new TreeNode();
-    
+    begin_->height_ = 0;
 }
 
 template <class value_type>
@@ -139,15 +143,21 @@ AvlTree<value_type>::AvlTree(std::initializer_list<value_type> const &items) : A
         insert(item);
     }
 }
+
+template <class value_type>
+AvlTree<value_type>::AvlTree(const AvlTree& other) : AvlTree() {
+    for (auto t : other)
+        insert(t);
+}
+
 template <class value_type>
 void AvlTree<value_type>::destruct_node(node* n) {
+    
     if (n) {
         destruct_node(n->left_);
         destruct_node(n->right_);
         delete n;
     }
-    
-    
 }
 template <class value_type>
 AvlTree<value_type>::~AvlTree(){
@@ -250,7 +260,7 @@ typename AvlTree<value_type>::node* AvlTree<value_type>::delete_min(node* n) {
 
 template <class value_type>
 typename AvlTree<value_type>::node* AvlTree<value_type>::delete_key(node* n, value_type key) {
-    if (!n)
+    if (!n || n == end_)
         return nullptr;
     if (key < n->key_) {
         n->left_ = delete_key(n->left_, key);
@@ -387,6 +397,10 @@ template <class key_type>
 bool AvlTree<key_type>::iterator::operator!=(const TreeIterator& iter) const noexcept {
     return this->data_ != iter.data_;
 }
+template <class key_type>
+bool AvlTree<key_type>::iterator::operator==(const TreeIterator& iter) const noexcept {
+    return this->data_ == iter.data_;
+}
 
 template <class key_type>
 void AvlTree<key_type>::iterator::operator++() {
@@ -396,7 +410,7 @@ void AvlTree<key_type>::iterator::operator++() {
             this->data_ = this->data_->left_;
     } else {
         node* tmp = this->data_->parent_;
-        while (tmp && tmp->key_ < this->data_->key_) {
+        while (tmp && tmp->parent_ && tmp->key_ < this->data_->key_) {
             tmp = tmp->parent_;
         }
         this->data_ = tmp;
@@ -414,7 +428,7 @@ void AvlTree<key_type>::iterator::operator--() {
 //            this->data_ = this->data_->parent_;
 //        } else {
             node* tmp = this->data_->parent_;
-            while (tmp && tmp->key_ > this->data_->key_) {
+            while (tmp && tmp->parent_ && tmp->key_ > this->data_->key_) {
                 tmp = tmp->parent_;
             }
             this->data_ = tmp;
@@ -423,11 +437,11 @@ void AvlTree<key_type>::iterator::operator--() {
 }
 //--------------------------iterators access---------------------------------
 template <class key_type>
-typename AvlTree<key_type>::iterator AvlTree<key_type>::begin() {
+typename AvlTree<key_type>::iterator AvlTree<key_type>::begin() const{
     return iterator(begin_);
 }
 template <class key_type>
-typename AvlTree<key_type>::iterator AvlTree<key_type>::end() {
+typename AvlTree<key_type>::iterator AvlTree<key_type>::end() const{
     return iterator(end_);
 }
 
@@ -452,11 +466,15 @@ template <class key_type>
 void  AvlTree<key_type>::clear() {
     destruct_node(root_);
     root_ = begin_ = end_ = new node;
+    size_ = 0;
+    begin_->height_ = 0;
 }
 template <class key_type>
 void  AvlTree<key_type>::erase(iterator pos) {
-    root_ = delete_key(root_, pos.data_->key_);
+    if (pos != end_ && contains(pos.data_->key_)) {
+        root_ = delete_key(root_, pos.data_->key_);
     --size_;
+}
 }
 template <class key_type>
 void  AvlTree<key_type>::swap(AvlTree& other) {
@@ -467,10 +485,12 @@ void  AvlTree<key_type>::swap(AvlTree& other) {
 template <class key_type>
 void  AvlTree<key_type>::merge(AvlTree& other) {
     for (auto key : other){
-        insert(key);
-    ++size_;
+        if (!contains(key)) {
+            insert(key);
+            other.erase(other.find(key));
+            //--other.size_;
+        }
     }
-    other.clear();
 }
 
 
@@ -486,24 +506,30 @@ typename AvlTree<key_type>::iterator AvlTree<key_type>::find(const_reference key
 
 template <class key_type>
 bool AvlTree<key_type>::contains(const_reference key) {
-   if( find(key) == end())
-       return false;
+   if( find(key) != end())
+       return true;
     else
-        return true;
+        return false;
 }
 //-------------------------tree func-----------------------------------------
 template <class key_type>
-typename AvlTree<key_type>::iterator AvlTree<key_type>::insert(const_reference key) {
-    if (begin_ == end_) {
-        end_->parent_ = begin_ = root_ = new node(key);
-        root_->right_ = end_;
-        end_->key_ = key;
-    } else {
+std::pair<typename AvlTree<key_type>::iterator, bool> AvlTree<key_type>::insert(const_reference key) {
+    bool result = false;
+    if (size_ == 0) {
+        begin_= root_ = new node(key);
+        begin_->parent_ = nullptr;
+        begin_->right_ = end_;
+        end_->parent_ = begin_;
+        ++size_;
+        return {begin(), true};
+    } else if (multi_ || find(key) == end()){
         root_ = insert_key(root_, nullptr, key);
         end_->key_ = std::max(end_->key_, key);
+        ++size_;
+        result = true;
     }
-    ++size_;
-    return iterator();
+    
+    return {find(key), result};
 }
 
 
