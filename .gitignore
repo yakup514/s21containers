@@ -1,2 +1,4 @@
 .DS_Store
 main_t.cpp
+.vscode/c_cpp_properties.json
+*.out
