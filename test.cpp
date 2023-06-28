@@ -10,7 +10,7 @@
 
 #include "tests/list_test.h"
 #include "tests/set_test.h"
-
+#include "tests/multiset_test.h"
 
 
 int main(int argc, char** argv) {

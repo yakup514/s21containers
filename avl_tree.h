@@ -9,12 +9,15 @@
 #define avl_tree_h
 #include <iostream>
 #include <limits>
+#include <vector>
 namespace s21 {
 template <class T>
 
 class AvlTree {
-public:
+protected:
     struct TreeNode;
+    using node = TreeNode;
+public:
     class TreeIterator;
     class TreeConstIterator;
     using value_type = T;
@@ -24,28 +27,29 @@ public:
     using iterator = TreeIterator;
     using const_iterator = TreeConstIterator;
     using size_type = size_t;
-    using node = TreeNode;
+    
     
 public:
-    AvlTree();
-    AvlTree(value_type key);
-    AvlTree(std::initializer_list<value_type> const &items);
+    AvlTree(bool multi);
+    AvlTree(value_type key, bool multi);
+    AvlTree(std::initializer_list<value_type> const &items, bool multi);
     AvlTree(const AvlTree& other);
-    //AvlTree(AvlTree&& other);
-    ~AvlTree();
-    //private:
+    AvlTree(AvlTree&& other);
+    void operator=(AvlTree &&other) noexcept;
+    virtual ~AvlTree();
+protected:
     struct TreeNode {
+        friend AvlTree;
     public:
         TreeNode(T val) : key_(val), height_(1) {};
         TreeNode() : height_(1) {};
-        //~TreeNode();
         T key_{};
         TreeNode* left_{};
         TreeNode* right_{};
         TreeNode* parent_{};
         int height_;
     };
-    
+public:
     class TreeConstIterator {
         friend AvlTree;
     public:
@@ -55,10 +59,8 @@ public:
         TreeConstIterator(const TreeConstIterator& it) : TreeConstIterator(it.data_){};
         const_reference operator*() const;
         bool operator!=(const TreeConstIterator& iter) const noexcept;
-        TreeConstIterator operator+(size_t n);
-        TreeConstIterator operator-(size_t n);
-        void operator++();
-        void operator--();
+        void operator++() noexcept;
+        void operator--() noexcept;
     private:
         node* data_;
     };
@@ -69,33 +71,41 @@ public:
         TreeIterator() : TreeConstIterator() {};
         TreeIterator(node* n) {this->data_ = n;}
         TreeIterator(const TreeIterator& it) : TreeIterator(it.data_){};
-        reference operator*();
+        reference operator*() noexcept;
         bool operator!=(const TreeIterator& iter) const noexcept;
         bool operator==(const TreeIterator& iter) const noexcept;
-        TreeIterator operator+(size_t n);
-        TreeIterator operator-(size_t n);
-        void operator++();
-        void operator--();
+        void operator++() noexcept;
+        void operator--() noexcept;
     };
+public:
     //------------------------------iterators access---------------------------
-    iterator begin() const;
-    iterator end() const;
+    iterator begin() const noexcept;
+    iterator end() const noexcept;
     
     //------------------------------capacity------------------------------------
-    bool empty();
-    size_type size();
-    size_type max_size();
+    bool empty() const noexcept;
+    size_type size() const noexcept;
+    size_type max_size() const noexcept;
     
     //------------------------------Modifiers-----------------------------------
-    void clear();
-   // std::pair<iterator, bool> insert(const value_type& value);
+    void clear() noexcept;
     void erase(iterator pos);
-    void swap(AvlTree& other);
+    void swap(AvlTree& other) noexcept;
     void merge(AvlTree& other);
     
     //------------------------------Lookup-----------------------------------
     iterator find(const_reference key);
-    bool contains(const_reference key);
+    bool contains(const_reference key) ;
+    std::pair<iterator, bool> insert(const_reference key);
+    size_type count(const_reference key) ;
+    std::pair<iterator,iterator> equal_range(const_reference key);
+    iterator lower_bound(const_reference key);
+    iterator upper_bound(const_reference key);
+    //----------------------------emplace------------------------------------
+    template <typename... Args>
+    std::vector<std::pair<iterator,bool>> emplace(Args&&... args);
+    void print() {print_tree(root_);};
+protected:
     //----------------------tree service func-----------------------------------
     void destruct_node(node* n);
     int get_height(node* n) {return n ? n->height_ : 0;}
@@ -115,39 +125,70 @@ public:
     node* find_key(node* n, value_type key);
     void print_tree(node* n);
     //-------------------------tree func-----------------------------------------
-    std::pair<iterator, bool> insert(const_reference key);
+    
 protected:
     node* root_, *end_, *begin_;
     size_type size_{};
-    bool multi_{false};
-    
-    // int size_;
-
+    bool multi_;
 
 };
 //---------------------member functions--------------------------
 template <class value_type>
-AvlTree<value_type>::AvlTree() {
+AvlTree<value_type>::AvlTree(bool multi) {
     root_ = begin_ = end_= new TreeNode();
     begin_->height_ = 0;
+    multi_ = multi;
+    
 }
 
 template <class value_type>
-AvlTree<value_type>::AvlTree(value_type key) : AvlTree(){
+AvlTree<value_type>::AvlTree(value_type key, bool multi) : AvlTree(multi){
     insert(key);
 }
 
 template <class value_type>
-AvlTree<value_type>::AvlTree(std::initializer_list<value_type> const &items) : AvlTree(){
+AvlTree<value_type>::AvlTree(std::initializer_list<value_type> const &items, bool multi) : AvlTree(multi){
     for (auto item : items) {
         insert(item);
     }
+
+   
 }
 
 template <class value_type>
-AvlTree<value_type>::AvlTree(const AvlTree& other) : AvlTree() {
-    for (auto t : other)
+AvlTree<value_type>::AvlTree(const AvlTree& other) : AvlTree(other.multi_) {
+  //  multi_ = other.multi_;
+ 
+    for (auto t : other) {
+      
         insert(t);
+     
+    }
+    
+}
+
+template <class value_type>
+AvlTree<value_type>::AvlTree(AvlTree&& other) {
+    
+    multi_ = other.multi_;
+    root_ = other.root_;
+    end_ = other.end_;
+    begin_ = other.begin_;
+    size_ = other.size_;
+    other.size_ = 0;
+    other.begin_ = other.end_ = other.root_ = nullptr;
+}
+
+template <class value_type>
+void AvlTree<value_type>::operator=(AvlTree &&other) noexcept {
+   
+    multi_ = other.multi_;
+    root_ = other.root_;
+    end_ = other.end_;
+    begin_ = other.begin_;
+    size_ = other.size_;
+    other.size_ = 0;
+    other.begin_ = other.end_ = other.root_ = nullptr;
 }
 
 template <class value_type>
@@ -159,6 +200,7 @@ void AvlTree<value_type>::destruct_node(node* n) {
         delete n;
     }
 }
+
 template <class value_type>
 AvlTree<value_type>::~AvlTree(){
     destruct_node(root_);
@@ -166,12 +208,7 @@ AvlTree<value_type>::~AvlTree(){
 }
 
 //----------------------tree service func-----------------------------------
-//template <class value_type>
-//AvlTree<value_type>::TreeNode::~TreeNode() {
-//    std::cout << "delete\n";
-//    delete left_;
-//    delete right_;
-//}
+
 template <class value_type>
 typename AvlTree<value_type>::node* AvlTree<value_type>::rotate_right(node* n){
     node* tmp = n->left_;
@@ -342,7 +379,7 @@ void AvlTree<value_type>::print_tree(node* n) {
     print_tree(n->left_);
     print_tree(n->right_);
 }
-#endif /* avl_tree_h */
+
 
 
 //-------------------------------iterators-------------------------------------
@@ -357,7 +394,7 @@ bool AvlTree<key_type>::const_iterator::operator!=(const TreeConstIterator& iter
 }
 
 template <class key_type>
-void AvlTree<key_type>::const_iterator::operator++() {
+void AvlTree<key_type>::const_iterator::operator++() noexcept{
     if (data_->right_) {
         data_ = data_->right_;
         while (data_->left_)
@@ -371,7 +408,7 @@ void AvlTree<key_type>::const_iterator::operator++() {
     }
 }
 template <class key_type>
-void AvlTree<key_type>::const_iterator::operator--() {
+void AvlTree<key_type>::const_iterator::operator--() noexcept{
     if (data_->left_) {
         data_ = data_->left_;
         while(data_->right_)
@@ -389,7 +426,7 @@ void AvlTree<key_type>::const_iterator::operator--() {
 
 
 template <class key_type>
-typename s21::AvlTree<key_type>::reference  AvlTree<key_type>::iterator::operator*()  {
+typename s21::AvlTree<key_type>::reference  AvlTree<key_type>::iterator::operator*() noexcept {
     return this->data_->key_;
 }
 
@@ -403,67 +440,84 @@ bool AvlTree<key_type>::iterator::operator==(const TreeIterator& iter) const noe
 }
 
 template <class key_type>
-void AvlTree<key_type>::iterator::operator++() {
+void AvlTree<key_type>::iterator::operator++() noexcept{
     if (this->data_->right_) {
         this->data_ = this->data_->right_;
         while (this->data_->left_)
             this->data_ = this->data_->left_;
     } else {
         node* tmp = this->data_->parent_;
-        while (tmp && tmp->parent_ && tmp->key_ < this->data_->key_) {
-            tmp = tmp->parent_;
+        if (tmp->left_ == this->data_ && tmp->key_ == this->data_->key_) {
+            this->data_ = tmp;;
+        } else {
+            node* curr = tmp;
+            while (tmp && tmp->parent_ && tmp->key_ <= this->data_->key_) {
+                if (tmp->left_ == curr && tmp->key_ == curr->key_) {
+                    break;
+                }
+                curr = tmp;
+                tmp = tmp->parent_;
+            }
+            
+            this->data_ = tmp;
         }
-        this->data_ = tmp;
     }
 }
 
 template <class key_type>
-void AvlTree<key_type>::iterator::operator--() {
+void AvlTree<key_type>::iterator::operator--() noexcept{
     if (this->data_->left_) {
         this->data_ = this->data_->left_;
         while(this->data_->right_)
             this->data_=this->data_->right_;
     } else {
-//        if (this->data_ == end_) {
-//            this->data_ = this->data_->parent_;
-//        } else {
-            node* tmp = this->data_->parent_;
-            while (tmp && tmp->parent_ && tmp->key_ > this->data_->key_) {
+        node* tmp = this->data_->parent_;
+        if (tmp->right_ == this->data_ && tmp->key_ == this->data_->key_) {
+            this->data_ = tmp;;
+        } else {
+            node* curr = tmp;
+            while (tmp && tmp->parent_ && tmp->key_ >= this->data_->key_) {
+                if (tmp->right_ == curr && tmp->key_ == curr->key_) {
+                    break;
+                }
+                curr = tmp;
                 tmp = tmp->parent_;
             }
+            
             this->data_ = tmp;
-//        }
+        }
+
     }
 }
 //--------------------------iterators access---------------------------------
 template <class key_type>
-typename AvlTree<key_type>::iterator AvlTree<key_type>::begin() const{
+typename AvlTree<key_type>::iterator AvlTree<key_type>::begin() const noexcept{
     return iterator(begin_);
 }
 template <class key_type>
-typename AvlTree<key_type>::iterator AvlTree<key_type>::end() const{
+typename AvlTree<key_type>::iterator AvlTree<key_type>::end() const noexcept{
     return iterator(end_);
 }
 
 //------------------------------capacity------------------------------------
 template <class key_type>
-bool AvlTree<key_type>::empty() {
+bool AvlTree<key_type>::empty() const noexcept{
     return size_ == 0;
 }
 
 template <class key_type>
-typename AvlTree<key_type>::size_type AvlTree<key_type>::size() {
+typename AvlTree<key_type>::size_type AvlTree<key_type>::size() const noexcept {
     return size_;
 }
 
 template <class key_type>
-typename AvlTree<key_type>::size_type AvlTree<key_type>::max_size() {
+typename AvlTree<key_type>::size_type AvlTree<key_type>::max_size() const noexcept{
     return std::numeric_limits<size_type>::max()/sizeof(node);
 }
 
 //------------------------------Modifiers-----------------------------------
 template <class key_type>
-void  AvlTree<key_type>::clear() {
+void  AvlTree<key_type>::clear()  noexcept{
     destruct_node(root_);
     root_ = begin_ = end_ = new node;
     size_ = 0;
@@ -477,7 +531,7 @@ void  AvlTree<key_type>::erase(iterator pos) {
 }
 }
 template <class key_type>
-void  AvlTree<key_type>::swap(AvlTree& other) {
+void  AvlTree<key_type>::swap(AvlTree& other) noexcept{
     std::swap(root_, other.root_);
     std::swap(end_, other.end_);
     std::swap(begin_, other.begin_);
@@ -485,9 +539,9 @@ void  AvlTree<key_type>::swap(AvlTree& other) {
 template <class key_type>
 void  AvlTree<key_type>::merge(AvlTree& other) {
     for (auto key : other){
-        if (!contains(key)) {
+        if (!contains(key) || multi_) {
             insert(key);
-            other.erase(other.find(key));
+            other.erase(find(key));
             //--other.size_;
         }
     }
@@ -504,6 +558,7 @@ typename AvlTree<key_type>::iterator AvlTree<key_type>::find(const_reference key
         return end();
 }
 
+
 template <class key_type>
 bool AvlTree<key_type>::contains(const_reference key) {
    if( find(key) != end())
@@ -511,6 +566,59 @@ bool AvlTree<key_type>::contains(const_reference key) {
     else
         return false;
 }
+
+template <class key_type>
+typename AvlTree<key_type>::size_type AvlTree<key_type>::count(const_reference key) {
+    node *n1 = find_key(root_, key);
+    node *n2 = n1;
+    if (n1 == nullptr)
+        return 0;
+    size_type result = 1;
+    while (n1->left_ && n1->left_->key_ == key) {
+        n1 = n1->left_;
+        ++result;
+    }
+    while (n2->right_ && n2->right_->key_ == key && n2->right_ != end_) {
+        n2 = n2->right_;
+        ++result;
+    }
+    return result;
+}
+
+template <class key_type>
+typename AvlTree<key_type>::iterator AvlTree<key_type>::lower_bound(const_reference key) {
+    node* tmp = root_;
+    while (tmp->key_ < key && tmp->right_) {
+        tmp = tmp->right_;
+    }
+    while (tmp->left_ && tmp->left_->key_ >= key)
+        tmp = tmp->left_;
+    return iterator(tmp);
+        
+}
+
+template <class key_type>
+typename AvlTree<key_type>::iterator AvlTree<key_type>::upper_bound(const_reference key) {
+    node* tmp = root_;
+    while (tmp->left_ && tmp->left_->key_ >= key)
+        tmp = tmp->left_;
+    while (!tmp->right_ && tmp->parent_)
+        tmp = tmp->parent_;
+    while (tmp->key_ <= key && tmp->right_) {
+        tmp = tmp->right_;
+    }
+    while (tmp->left_ && tmp->left_->key_ > key)
+        tmp = tmp->left_;
+   
+    return iterator(tmp);
+        
+}
+
+template <class key_type>
+typename std::pair<typename AvlTree<key_type>::iterator, typename AvlTree<key_type>::iterator> AvlTree<key_type>::equal_range(const_reference key) {
+    return {lower_bound(key), upper_bound(key)};
+}
+
 //-------------------------tree func-----------------------------------------
 template <class key_type>
 std::pair<typename AvlTree<key_type>::iterator, bool> AvlTree<key_type>::insert(const_reference key) {
@@ -520,9 +628,14 @@ std::pair<typename AvlTree<key_type>::iterator, bool> AvlTree<key_type>::insert(
         begin_->parent_ = nullptr;
         begin_->right_ = end_;
         end_->parent_ = begin_;
+        end_->key_ = key;
         ++size_;
         return {begin(), true};
     } else if (multi_ || find(key) == end()){
+        if (max_size() == size_) {
+           throw std::overflow_error(
+               "size > max_size");
+         }
         root_ = insert_key(root_, nullptr, key);
         end_->key_ = std::max(end_->key_, key);
         ++size_;
@@ -534,14 +647,17 @@ std::pair<typename AvlTree<key_type>::iterator, bool> AvlTree<key_type>::insert(
 
 
 
-
-
-
-
-
-
-
-
-
-
+//----------------------------emplace------------------------------------
+template <class key_type>
+template <typename... Args>
+std::vector<std::pair<typename AvlTree<key_type>::iterator,bool>> AvlTree<key_type>::emplace(Args&&... args) {
+    std::vector<std::pair<iterator, bool>> res;
+    for (auto arg : {args...}) {
+        auto p = insert(arg);
+        res.push_back(p);
+    }
+    return res;
 }
+}
+
+#endif /* avl_tree_h */

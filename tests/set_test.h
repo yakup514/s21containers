@@ -97,6 +97,15 @@ TEST(set_constructor, test7) {
     EXPECT_EQ(d11.size(), d22.size());
 }
 
+TEST(set_oper_eq, test1) {
+    s21::Set<int> d1{5, 4, 3, 2, 2, 1};
+    std::set<int> d2{5, 4, 3, 2, 2, 1};
+    s21::Set<int> d11 = (std::move(d1));
+    std::set<int> d22 = (std::move(d2));
+    
+    EXPECT_EQ(true, compare_func(d11, d22));
+}
+
 TEST(set_begin, test1) {
     s21::Set<int> d1{5, 4, 3, 2, 2, 1};
     std::set<int> d2{5, 4, 3, 2, 2, 1};
@@ -274,4 +283,12 @@ TEST(set_merge, test4) {
     EXPECT_EQ(true, compare_func(d11, d22));
     EXPECT_EQ(true, compare_func(d1, d2));
 }
-#endif /* list_test_h */
+
+TEST(set_emplace, test1) {
+    s21::Set<int> d1;
+    auto vec = d1.emplace( 1, 2,2, 1, 4, 5);
+    std::set<int> d2{ 1, 2, 2, 1, 4, 5};
+    EXPECT_EQ(true, compare_func(d1, d2));
+}
+
+#endif /* set_test_h */
